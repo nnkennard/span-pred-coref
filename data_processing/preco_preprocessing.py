@@ -6,6 +6,7 @@ import sys
 
 import convert_lib
 
+
 def get_records_from_preco_file(filename):
   with open(filename, 'r') as f:
     return f.readlines()
@@ -41,11 +42,13 @@ def preprocess(data_dir):
     with open(os.path.join(preco_dir, split_name + ".jsonl"), 'w') as f:
       f.write("".join(records))
 
+
 def update_label(old_label, new_label):
   if old_label == "-":
     return new_label
   else:
     return old_label + "|" + new_label
+
 
 def clusters_to_label_list(mention_clusters, sentences):
   labels = []
@@ -55,8 +58,6 @@ def clusters_to_label_list(mention_clusters, sentences):
   for i, cluster in enumerate(mention_clusters):
     for (sentence_idx, start, end) in cluster:
       inc_end = end - 1
-      
-      print(start, end)
 
       if start == inc_end:
         labels[sentence_idx][start] = update_label(
@@ -68,7 +69,9 @@ def clusters_to_label_list(mention_clusters, sentences):
           labels[sentence_idx][inc_end], "{})".format(i))
   return labels
 
+
 CONLL_PLACEHOLDER = "_POS\t_PARSE\t_\t_\t_\t*"
+
 
 def jsonl_to_conll(filename):
   with open(filename, 'r') as f:
@@ -86,19 +89,17 @@ def jsonl_to_conll(filename):
             document_lines.append("\t".join(
                   [line_obj["id"], "0", str(i), token, CONLL_PLACEHOLDER, label]))
           document_lines.append("")
+
         g.write(
         "#begin document ({}); part {}\n".format(line_obj["id"], 0))
-        g.write("\n".join(document_lines))
-  exit()
+        g.write("\n".join([line for line in document_lines]))
+        g.write("#end document\n")
         
-    
-        
-              
 
 def convert_preco_to_conll(data_home):
-  for filename in glob.glob(data_home + "/original/preco/*"):
+  for filename in glob.glob(data_home + "/original/preco/*.jsonl"):
     jsonl_to_conll(filename)
-    print(filename)
+
 
 def main():
   
@@ -107,21 +108,8 @@ def main():
   # Resplit the Preco files to get a train/dev/test split
   preprocess(data_home)
 
+  # Convert preco jsonl format to conll format
   convert_preco_to_conll(data_home)
-
-  exit()
-
-  convert_format(data_home)
-  superset_dir = os.path.join(data_home, "processed", "preco/all_info")
-  for subset in ["train", "dev", "test"]:
-    all_info_filename = superset_dir + "/" + subset + ".jsonl"
-    for new_type in FN_MAP.keys():
-      for max_seg_len in [convert_lib.ProcessingStage.SEGMENTED_384,
-                          convert_lib.ProcessingStage.SEGMENTED_512]:
-        create_injected_file(all_info_filename, new_type, max_seg_len)
-  
-  # Clean up Unicode glitches and empty sentences
-
 
 
 if __name__ == "__main__":
