@@ -7,11 +7,15 @@ class DatasetName(object):
   preco = 'preco'
 
 class Variation(object):
+
   classic = 'classic'
-  sing = 'sing'
   gold = 'gold'
+
   goldconst = 'goldconst'
   predconst = 'predconst'
+
+  goldsing = 'goldsing'
+  predsing = 'predsing'
 
 class DatasetSplit(object):
   train = 'train'
