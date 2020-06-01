@@ -70,13 +70,13 @@ def clusters_to_label_list(mention_clusters, sentences):
   return labels
 
 
-CONLL_PLACEHOLDER = "_POS\t_PARSE\t_\t_\t_\t*"
+CONLL_PLACEHOLDER = "_POS\t_PARSE\t_\t_\t_\t_SPEAKER\t*"
 
 
 def jsonl_to_conll(filename):
   with open(filename, 'r') as f:
     assert filename.endswith(".jsonl")
-    out_filename = filename.replace(".jsonl", ".conll")
+    out_filename = filename.replace(".jsonl", ".txt")
     with open(out_filename, 'w') as g:
       for line in f:
         line_obj = json.loads(line)
@@ -93,7 +93,7 @@ def jsonl_to_conll(filename):
         g.write(
         "#begin document ({}); part {}\n".format(line_obj["id"], 0))
         g.write("\n".join([line for line in document_lines]))
-        g.write("#end document\n")
+        g.write("\n#end document\n")
         
 
 def convert_preco_to_conll(data_home):

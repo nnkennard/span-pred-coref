@@ -1,3 +1,5 @@
+import collections
+
 def listify_conll_dataset(filename):
 
   dataset = []
@@ -41,6 +43,41 @@ def write_listified_dataset_to_file(dataset, filename):
           for token in sentence:
             g.write("\t".join(token) + "\n")
           g.write("\n")
+
+def ldd_append(ldd, to_append):
+  for k, v in to_append.items():
+    ldd[k] += v
+  return ldd
+
+
+class LabelSequences(object):
+  WORD = "WORD"
+  POS = "POS"
+  NER = "NER"
+  PARSE = "PARSE"
+  COREF = "COREF"
+  SPEAKER = "SPEAKER"
+  PREDPOS = "PREDPOS"
+  PREDPARSE = "PREDPARSE"
+
+MINICONLL_FIELD_MAP = {
+  LabelSequences.WORD: 3,
+  LabelSequences.POS: 4, 
+  LabelSequences.PARSE: 5, 
+  LabelSequences.SPEAKER: 9, 
+  LabelSequences.COREF: 10,
+  LabelSequences.PREDPOS: 11,
+  LabelSequences.PREDPARSE: 12,
+}
+
+def get_index(list_of_lists, index):
+  return [record[index] for record in list_of_lists]
+
+def get_sequences(sentence, field_map=MINICONLL_FIELD_MAP):
+  sequences = {}
+  for field, index in field_map.items():
+    sequences[field] = get_index(sentence, index)
+  return sequences
 
 
 def build_coref_span_map(coref_col, offset=0):
@@ -88,10 +125,16 @@ def split_parse_label(label):
 
 
 def build_parse_span_map(parse_col, offset=0):
+
+  #print(parse_col)
+  if parse_col == ["_PARSE"]: # This is for empty sentences in PreCo
+    return {}
+
   span_starts = collections.defaultdict(list)
   stack = []
   label_map = {}
   for i, orig_label in enumerate(parse_col):
+    #print(stack)
     labels = split_parse_label(orig_label) # Chunking around parens
     for label in labels:
       if label.startswith("("): # Register start of a label
