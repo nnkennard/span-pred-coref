@@ -3,6 +3,7 @@ import collections
 import json
 import numpy as np
 import os
+import tqdm
 
 from bert import tokenization
 
@@ -15,8 +16,9 @@ SEP = "[SEP]"
 
 
 class DatasetName(object):
-  conll = 'conll12'
+  conll = 'conll'
   preco = 'preco'
+  ALL = [conll, preco]
 
 class Variation(object):
 
@@ -54,40 +56,27 @@ class Dataset(object):
     assert ProcessingStage.TOKENIZED in self.documents
 
     if ProcessingStage.BPE_TOKENIZED not in self.documents:
-      self.documents[ProcessingStage.BPE_TOKENIZED] = [
-        bpe_tokenize_document(document, TOKENIZER)
-        for document in self.documents[ProcessingStage.TOKENIZED]]
+      print("BPE tokenizing documents")
+      for document in tqdm.tqdm(self.documents[ProcessingStage.TOKENIZED]):
+        self.documents[ProcessingStage.BPE_TOKENIZED].append(
+          bpe_tokenize_document(document, TOKENIZER))
 
     for new_stage in [
       ProcessingStage.SEGMENTED_384, ProcessingStage.SEGMENTED_512]:
       if new_stage not in self.documents:
-        self.documents[new_stage] = [
-          segment_document(document, new_stage)
-          for document in self.documents[ProcessingStage.BPE_TOKENIZED]]
+        print("Resegmenting documents (", new_stage, ")")
+        for document in tqdm.tqdm(self.documents[ProcessingStage.BPE_TOKENIZED]):
+          self.documents[new_stage].append(segment_document(document, new_stage))
 
       lines = [doc.dump_to_json() for doc in self.documents[new_stage]]
     
       assert file_name.endswith(".jsonl")
       seg_filename =  file_name.replace(".jsonl", "_" + new_stage + ".jsonl")
+      create_dir(seg_filename.rsplit("/", 1)[0])
       with open(seg_filename, 'w') as f:
         f.write("\n".join(lines))
 
-  def dump_to_conll(self, file_name, drop_singletons=False):
-    assert ProcessingStage.TOKENIZED in self.documents
-
-    lines = [doc.dump_to_conll(drop_singletons)
-             for doc in self.documents[ProcessingStage.TOKENIZED]]
   
-    print("writing conll file")
-    assert file_name.endswith(".conll")
-    if drop_singletons:
-      file_name = file_name.replace(".conll", ".classic.conll")
-    else:
-      file_name = file_name.replace(".conll", ".sing.conll")
-    with open(file_name, 'w') as f:
-      f.write("\n".join(lines))
-
-
 def flatten(nonflat):
   return sum(nonflat,[])
 
@@ -101,8 +90,7 @@ class ProcessingStage(object):
 
 
 class CorefDocument(object):
-  def __init__(self, doc_id, part, other_info="{}",
-      init_status=ProcessingStage.UNINITIALIZED):
+  def __init__(self, doc_id, part, init_status=ProcessingStage.UNINITIALIZED):
 
     self.doc_id = doc_id
     self.doc_part = part
@@ -116,8 +104,7 @@ class CorefDocument(object):
     self.subtoken_map = []
     self.sentence_map = []
 
-    self.token_sentences = [] # Need to thread this through for parsing later
-    self.other_info_json = other_info
+    self.token_sentences = [] # TODO: remove this?
 
 
   def dump_to_json(self):
@@ -132,7 +119,6 @@ class CorefDocument(object):
           "speakers": self.speakers,
           "clusters": self.clusters,
           "inject_mentions": self.injected_mentions,
-          "other_info": json.loads(self.other_info_json),
           "token_sentences": self.token_sentences,
           "bpe_maps": self.bpe_maps,
           "subtoken_offsets": self.subtoken_offsets,
@@ -145,45 +131,6 @@ class CorefDocument(object):
     else:
       return original_label + "|" + additional_label
 
-  def dump_to_conll(self, drop_singletons=False):
-    assert self.status == ProcessingStage.TOKENIZED
-    token_sentences = self.sentences
-    token_clusters = self.clusters
-    if drop_singletons:
-      token_clusters = [cluster for cluster in token_clusters if len(cluster) > 1]
-  
-    flat_coref_labels = ["-"] * len(flatten(token_sentences))
-    for idx, cluster in enumerate(token_clusters):
-      for start, end in cluster:
-        if start == end:
-          flat_coref_labels[start] = self._update_label(
-              flat_coref_labels[start], "({})".format(str(idx)))
-        else:
-          flat_coref_labels[start] = self._update_label(
-              flat_coref_labels[start], "({}".format(str(idx)))
-          flat_coref_labels[end] = self._update_label(
-              flat_coref_labels[end], "{})".format(str(idx)))
-
-    doc_lines = [
-        "#begin document ({}); part {}".format(self.doc_id, self.doc_part)]
-
-    str_doc_part = str(int(self.doc_part))
-    token_offset = 0
-    for sentence, speakers in zip(token_sentences, self.speakers):
-      coref_labels = flat_coref_labels[
-          token_offset:token_offset+len(sentence)]
-      token_offset += len(sentence)
-
-      for i, (token, label, speaker) in enumerate(
-          zip(sentence, coref_labels, speakers)):
-        doc_lines.append("\t".join([self.doc_id, str_doc_part, str(i), token,
-        "_POS", "_PARSE", "_", "_", "_", speaker, "*", label]))
-      doc_lines.append("")
-  
-    doc_lines.append("#end document")
-
-    return "\n".join(doc_lines)
-
 
 def all_same(l):
   return len(set(l)) == 1
@@ -195,7 +142,7 @@ def bpe_tokenize_document(document, tokenizer):
   assert document.status == ProcessingStage.TOKENIZED
 
   bpe_document = CorefDocument(document.doc_id, document.doc_part,
-      document.other_info_json, ProcessingStage.BPE_TOKENIZED)
+                    ProcessingStage.BPE_TOKENIZED)
 
   bpe_document.token_sentences = document.sentences
   bpe_document.token_clusters = document.clusters
@@ -276,9 +223,6 @@ def remap_clusters(clusters, start_offsets, optional_end_offsets=None,
   else:
     end_offsets = optional_end_offsets
 
-  print("Clusters:")
-  print(clusters)
-    
   new_clusters = []
   for cluster in clusters:
     new_cluster = []
@@ -300,8 +244,7 @@ def segment_document(bpe_document, new_stage):
   max_segment_len = STAGE_TO_LEN[new_stage]
 
   seg_document = CorefDocument(
-      bpe_document.doc_id, bpe_document.doc_part, bpe_document.other_info_json,
-      new_stage)
+      bpe_document.doc_id, bpe_document.doc_part, new_stage)
 
   seg_document.token_sentences = bpe_document.token_sentences
   seg_document.token_clusters = bpe_document.token_clusters

@@ -126,7 +126,6 @@ def split_parse_label(label):
 
 def build_parse_span_map(parse_col, offset=0):
 
-  #print(parse_col)
   if parse_col == ["_PARSE"]: # This is for empty sentences in PreCo
     return {}
 
@@ -134,7 +133,6 @@ def build_parse_span_map(parse_col, offset=0):
   stack = []
   label_map = {}
   for i, orig_label in enumerate(parse_col):
-    #print(stack)
     labels = split_parse_label(orig_label) # Chunking around parens
     for label in labels:
       if label.startswith("("): # Register start of a label

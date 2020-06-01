@@ -1,5 +1,7 @@
 import collections
+import os
 import sys
+import tqdm
 
 import conll_lib
 import convert_lib
@@ -72,10 +74,7 @@ def add_sentence(curr_doc, curr_sent, doc_level_maps,
   coref_span_map = conll_lib.build_coref_span_map(
       sequences[conll_lib.LabelSequences.COREF], sentence_offset)
 
-  print("COREF SPAN MAP")
   doc_level_maps["COREF"] = conll_lib.ldd_append(doc_level_maps["COREF"], coref_span_map)
-  print(coref_span_map)
-  print(doc_level_maps["COREF"])
 
   pred_parse_span_map = conll_lib.build_parse_span_map(
       sequences[conll_lib.LabelSequences.PREDPARSE], sentence_offset)
@@ -105,8 +104,6 @@ def convert(document, dataset_name):
   curr_doc_id = begin_line[2][1:-2]
   curr_doc_part = begin_line[-1]
 
-  print(curr_doc_part, curr_doc_id)
-
   curr_doc = convert_lib.CorefDocument(
       curr_doc_id, curr_doc_part,
       init_status=convert_lib.ProcessingStage.TOKENIZED)
@@ -128,17 +125,23 @@ def convert(document, dataset_name):
 
 
 def main():
-  conll_file = sys.argv[1]
+  data_home = sys.argv[1]
 
-  listified_dataset = conll_lib.listify_conll_dataset(conll_file)
-  new_dataset = convert_lib.Dataset("placeholder name")
-  for document in listified_dataset:
-    converted_document = convert(document, "conll12")
-    new_dataset.documents[convert_lib.ProcessingStage.TOKENIZED].append(converted_document)
+  for dataset in convert_lib.DatasetName.ALL:
+    for subset in convert_lib.DatasetSplit.ALL:
+      input_file = os.path.join(data_home, "original", dataset,
+                                subset + ".miniconll")
+      print(dataset, subset)
+      listified_dataset = conll_lib.listify_conll_dataset(input_file)
+      new_dataset = convert_lib.Dataset(dataset + "_" + subset)
+      for document in tqdm.tqdm(listified_dataset):
+        converted_document = convert(document, dataset)
+        new_dataset.documents[convert_lib.ProcessingStage.TOKENIZED].append(converted_document)
 
-  new_dataset.dump_to_jsonl("temp.jsonl")
 
-  print(listified_dataset[0])
+      output_file = os.path.join(data_home, "processed", dataset,
+                                subset + ".jsonl")
+      new_dataset.dump_to_jsonl(output_file)
 
 
 if __name__ == "__main__":
