@@ -6,7 +6,6 @@ import sys
 
 import convert_lib
 
-
 def get_records_from_preco_file(filename):
   with open(filename, 'r') as f:
     return f.readlines()

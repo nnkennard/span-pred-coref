@@ -96,9 +96,9 @@ def build_coref_span_map(coref_col, offset=0):
             span_starts[label[1:]].append(i) # Register span start for later
         elif label.endswith(")"):
           ending_cluster = label[:-1] # Which cluster is ending here
-          assert len(span_starts[ending_cluster]) in [1, 2]
+          assert len(span_starts[ending_cluster]) in [1, 2, 3]
           # Sometimes it's closing a nested span but apparently never more than
-          # two levels for the same entity
+          # three levels for the same entity
           start_idx = span_starts[ending_cluster].pop(-1)
           # The one added latest is the match
           complete_spans.append((start_idx, i, ending_cluster))
@@ -126,7 +126,7 @@ def split_parse_label(label):
 
 def build_parse_span_map(parse_col, offset=0):
 
-  if parse_col == ["_PARSE"]: # This is for empty sentences in PreCo
+  if set(parse_col) == set(["_PARSE"]): # This is for empty sentences and empty gold parses in PreCo
     return {}
 
   span_starts = collections.defaultdict(list)

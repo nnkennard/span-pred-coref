@@ -49,8 +49,9 @@ def get_predsing_injected_mentions(doc_level_maps):
   return sorted(list(set(token_mentions).union(set(np_mentions))))
 
 def get_goldsing_injected_mentions(doc_level_maps):
+  coref_spans = list(doc_level_maps["COREF"].values())
   assert len(coref_spans) > len(non_singletons(coref_spans))
-  return sum(coref_spans, [])
+  return flatten(coref_spans)
 
 
 FN_MAP = {
@@ -128,7 +129,11 @@ def main():
   data_home = sys.argv[1]
 
   for dataset in convert_lib.DatasetName.ALL:
-    for subset in convert_lib.DatasetSplit.ALL:
+    if dataset == 'conll':
+      print("Skipping conll")
+      continue
+    #for subset in convert_lib.DatasetSplit.ALL:
+    for subset in ["test"]:
       input_file = os.path.join(data_home, "original", dataset,
                                 subset + ".miniconll")
       print(dataset, subset)
